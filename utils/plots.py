@@ -57,7 +57,7 @@ def check_font(font='Arial.ttf', size=10):
     try:
         return ImageFont.truetype(str(font) if font.exists() else font.name, size)
     except Exception as e:  # download if missing
-        url = "https://github.com/thunder95/YOLOv5-Paddle/releases/download/v1.0/" + font.name
+        url = "https://github.com/GuoQuanHao/YOLOv5-Paddle/releases/download/v1.0/" + font.name
         print(f'Downloading {url} to {font}...')
         download_url_to_file(url, str(font), progress=False) # 注意
         return ImageFont.truetype(str(font), size)

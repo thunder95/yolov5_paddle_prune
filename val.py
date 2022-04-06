@@ -183,7 +183,7 @@ def run(data,
     niou = len(iouv.flatten())
 
     # Dataloader
-    print("check training...", training)
+    # print("check training...", training)
     if not training or not dataloader:
         if 'CUDA' in str(device):
             model(paddle.zeros([1, 3, imgsz, imgsz], dtype=paddle.float32))  # run once
@@ -227,13 +227,9 @@ def run(data,
         targets[:, 2:] *= np.array([width, height, width, height])  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
         t3 = time_sync()
-        print(conf_thres, iou_thres, out.numpy().shape, paths)
+        # print(conf_thres, iou_thres, out.numpy().shape, paths)
 
         out = non_max_suppression(out.numpy(), conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
-        print(out[0].shape)
-        exit()
-
-
         dt[2] += time_sync() - t3
 
         # Statistics per image

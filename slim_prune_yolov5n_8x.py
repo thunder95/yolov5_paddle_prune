@@ -158,8 +158,8 @@ if __name__ == '__main__':
                     remain = int(mask.sum())
                     pruned = pruned + mask.shape[0] - remain
 
-                    print(f'->layer index: {idx:>3d} \t total channel: {mask.shape[0]:>4d} \t '
-                          f'remaining channel: {remain:>4d}')
+                    # print(f'->layer index: {idx:>3d} \t total channel: {mask.shape[0]:>4d} \t '
+                    #       f'remaining channel: {remain:>4d}')
             else:
                 mask = paddle.ones(bn_module.weight.shape)
                 remain = mask.shape[0]

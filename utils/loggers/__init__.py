@@ -16,16 +16,19 @@ from utils.plots import plot_images, plot_results
 LOGGERS = ('csv', 'vb', 'wandb')  # text-file, VisualDL, Weights & Biases
 RANK = int(os.getenv('RANK', -1))
 
-try:
-    import wandb
+os.environ["WANDB_SILENT"] = "true"
 
-    assert hasattr(wandb, '__version__')  # verify package import not local dir
-    if pkg.parse_version(wandb.__version__) >= pkg.parse_version('0.12.2') and RANK in [0, -1]:
-        wandb_login_success = wandb.login(timeout=30)
-        if not wandb_login_success:
-            wandb = None
-except (ImportError, AssertionError):
-    wandb = None
+# try:
+#     import wandb
+#
+#     assert hasattr(wandb, '__version__')  # verify package import not local dir
+#     if pkg.parse_version(wandb.__version__) >= pkg.parse_version('0.12.2') and RANK in [0, -1]:
+#         wandb_login_success = wandb.login(timeout=30)
+#         if not wandb_login_success:
+#             wandb = None
+# except (ImportError, AssertionError):
+#     wandb = None
+wandb = None
 
 
 class Loggers():
@@ -59,13 +62,14 @@ class Loggers():
             self.vb = LogWriter(str(s))
 
         # W&B
-        if wandb and 'wandb' in self.include:
-            wandb_artifact_resume = isinstance(self.opt.resume, str) and self.opt.resume.startswith('wandb-artifact://')
-            run_id = paddle.load(self.weights).get('wandb_id') if self.opt.resume and not wandb_artifact_resume else None
-            self.opt.hyp = self.hyp  # add hyperparameters
-            self.wandb = WandbLogger(self.opt, run_id)
-        else:
-            self.wandb = None
+        # if wandb and 'wandb' in self.include:
+        #     wandb_artifact_resume = isinstance(self.opt.resume, str) and self.opt.resume.startswith('wandb-artifact://')
+        #     run_id = paddle.load(self.weights).get('wandb_id') if self.opt.resume and not wandb_artifact_resume else None
+        #     self.opt.hyp = self.hyp  # add hyperparameters
+        #     self.wandb = WandbLogger(self.opt, run_id)
+        # else:
+        #     self.wandb = None
+        self.wandb = None
 
     def on_pretrain_routine_end(self):
         # Callback runs on pre-train routine end

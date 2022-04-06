@@ -51,7 +51,7 @@ from utils.loss import ComputeLoss
 from utils.plots import plot_labels, plot_evolve
 from utils.paddle_utils import EarlyStopping, ModelEMA, de_parallel, intersect_dicts, select_device, \
     paddle_distributed_zero_first
-from utils.loggers.wandb.wandb_utils import check_wandb_resume
+# from utils.loggers.wandb.wandb_utils import check_wandb_resume
 from utils.metrics import fitness
 from utils.loggers import Loggers
 from utils.callbacks import Callbacks
@@ -95,10 +95,10 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # Loggers
     if RANK in [-1, 0]:
         loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
-        if loggers.wandb:
-            data_dict = loggers.wandb.data_dict
-            if resume:
-                weights, epochs, hyp = opt.weights, opt.epochs, opt.hyp
+        # if loggers.wandb:
+        #     data_dict = loggers.wandb.data_dict
+        #     if resume:
+        #         weights, epochs, hyp = opt.weights, opt.epochs, opt.hyp
 
         # Register actions
         for k in methods(loggers):
@@ -267,7 +267,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     print("rank: ", RANK, "sr: ", opt.sr)
     if RANK in [-1, 0]:
         for idx in prune_idx:
-            bn_weights = gather_bn_weights(cfg_model.module_list, [idx])
+            bn_weights = gather_bn_weights(cfg_model.module_list, [idx], False)
             log_writer.add_histogram('before_train_perlayer_bn_weights/hist', bn_weights.numpy(), step=idx)
 
     # Start training
@@ -410,7 +410,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                         'state_dict': ema.ema.state_dict(),
                         'updates': ema.updates,
                         'optimizer': optimizer.state_dict(),
-                        'wandb_id': loggers.wandb.wandb_run.id if loggers.wandb else None}
+                        'wandb_id': None}
 
                 # Save last, best and delete
                 paddle.save(ckpd, str(last))
@@ -527,7 +527,7 @@ def main(opt, callbacks=Callbacks()):
         check_requirements(exclude=['thop'])
 
     # Resume
-    if opt.resume and not check_wandb_resume(opt) and not opt.evolve:  # resume an interrupted run
+    if opt.resume and not opt.evolve:  # resume an interrupted run
         ckpd = opt.resume if isinstance(opt.resume, str) else get_latest_run()  # specified or most recent path
         assert os.path.isfile(ckpd), 'ERROR: --resume checkpoint does not exist'
         with open(Path(ckpd).parent.parent / 'opt.yaml', errors='ignore') as f:
