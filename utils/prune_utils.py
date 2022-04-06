@@ -16,8 +16,9 @@ class BNOptimizer():
             for idx in prune_idx:
                 # Squential(Conv, BN, Lrelu)
                 # bn_module = module_list[idx][1]
-                bn_module = module_list[idx][1] if type(
-                    module_list[idx][1]).__name__ == 'BatchNorm2D' else module_list[idx][0]
+                # bn_module = module_list[idx][1] if type(
+                #     module_list[idx][1]).__name__ == 'BatchNorm2D' else module_list[idx][0]
+                bn_module = module_list[idx]['BatchNorm2D']
                 bn_module.weight.grad.add_(s * paddle.sign(bn_module.weight))  # L1
             if idx2mask:
                 for idx in idx2mask:
@@ -30,6 +31,15 @@ class BNOptimizer():
     @staticmethod
     def updateBN_scaler(sr_flag, module_list, s, prune_idx, epoch,scaler, idx2mask=None, opt=None):
         # print("===> updateBN_scaler", sr_flag, s, prune_idx)
+
+        if use_index:
+            size_list = [module_list[idx][1].weight.shape[0] if type(module_list[idx][1]).__name__ == 'BatchNorm2D' else
+                         module_list[idx][0].weight.shape[0] for idx in prune_idx]
+        else:
+            size_list = [module_list[idx]["BatchNorm2D"].weight.shape[0] if type(
+                module_list[idx]["BatchNorm2D"]).__name__ == 'BatchNorm2D' else
+                         module_list[idx]["Conv2D"].weight.shape[0] for idx in prune_idx]
+
         if sr_flag:
             # s = s if epoch <= opt.epochs * 0.5 else s * 0.01
             for idx in prune_idx:

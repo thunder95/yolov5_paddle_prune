@@ -165,6 +165,7 @@ class WandbLogger():
                                         job_type=job_type,
                                         id=run_id,
                                         allow_val_change=True) if not wandb.run else wandb.run
+            pass
         if self.wandb_run:
             if self.job_type == 'Training':
                 if opt.upload_dataset:
