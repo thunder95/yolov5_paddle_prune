@@ -1,0 +1,4 @@
+classes= 1
+train=/f/dataset/person/out/train.txt
+valid=/f/dataset/person/out/valid.txt
+names=data/person.names
