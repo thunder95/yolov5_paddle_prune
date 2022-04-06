@@ -146,7 +146,7 @@ def get_latest_run(search_dir='.'):
     return max(last_list, key=os.path.getctime) if last_list else ''
 
 
-def user_config_dir(dir='QuanhaoGuo', env_var='YOLOV5_CONFIG_DIR'):
+def user_config_dir(dir='thunder95', env_var='YOLOV5_CONFIG_DIR'):
     # Return path of user configuration directory. Prefer environment variable if exists. Make dir if required.
     env = os.getenv(env_var)
     if env:
