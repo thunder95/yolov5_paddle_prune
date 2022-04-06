@@ -126,7 +126,12 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     yaml_cfg="models/yolov5n.yaml" # 暂时先写死
     model = Model(yaml_cfg, ch=3, nc=nc, anchors=hyp.get('anchors'))  # create
     copy_weight_v6_reverse(model, cfg_model)
-    model.set_state_dict(paddle.load(weights)['state_dict'])
+    raw_wgt = paddle.load(weights)
+    if 'state_dict' in raw_wgt:
+        raw_wgt = raw_wgt['state_dict']
+    elif 'model' in raw_wgt:
+        raw_wgt = raw_wgt['model']
+    model.set_state_dict(raw_wgt)
 
     # Freeze
     freeze = [f'model.{x}.' for x in range(freeze)]  # layers to freeze
