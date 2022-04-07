@@ -388,7 +388,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                                            compute_loss=compute_loss)
 
             # 剪枝后bn层权重
-            bn_weights = gather_bn_weights(cfg_model.module_list, prune_idx)
+            bn_weights = gather_bn_weights(cfg_model.module_list, prune_idx, False)
             log_writer.add_histogram('bn_weights/hist', bn_weights.numpy(), step=epoch)
 
             # Update best mAP
@@ -441,7 +441,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         print(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
 
         for idx in prune_idx:
-            bn_weights = gather_bn_weights(cfg_model.module_list, [idx])
+            bn_weights = gather_bn_weights(cfg_model.module_list, [idx], False)
             log_writer.add_histogram('after_train_perlayer_bn_weights/hist', bn_weights.numpy(), step=idx)
 
         for f in last, best:
