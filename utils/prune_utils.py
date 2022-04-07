@@ -36,9 +36,10 @@ class BNOptimizer():
             for idx in prune_idx:
                 # Squential(Conv, BN, Lrelu)
                 # bn_module = module_list[idx][1]
-                bn_module = module_list[idx][1] if type(
-                    module_list[idx][1]).__name__ == 'BatchNorm2D' else module_list[idx][0]
+                # bn_module = module_list[idx][1] if type(
+                #     module_list[idx][1]).__name__ == 'BatchNorm2D' else module_list[idx][0]
                 # print(bn_module)
+                bn_module = module_list[idx]['BatchNorm2D']
                 bn_module.weight.grad.add_(scaler.scale(s * paddle.sign(bn_module.weight)))  # L1
             if idx2mask:
                 for idx in idx2mask:
