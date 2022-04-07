@@ -139,13 +139,13 @@ def run(data,
 
         # Load model
         check_suffix(weights, '.pdparams')
-        print("--->cfg: ", cfg)
+        # print("--->cfg: ", cfg)
         yaml_cfg = "models/yolov5n.yaml"  # 暂时先写死
         model = Model(yaml_cfg, ch=3, nc=nc, anchors=hyp.get('anchors'))  # create
         names = {0: "person"}
 
         if cfg.endswith(".cfg"):
-            print("weights",weights, opt.cfg)
+            # print("weights",weights, opt.cfg)
             cfg_model = Darknet(opt.cfg, (opt.imgsz, opt.imgsz))
 
             initialize_weights(cfg_model)
