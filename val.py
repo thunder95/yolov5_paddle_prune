@@ -146,7 +146,7 @@ def run(data,
 
         if cfg.endswith(".cfg"):
             # print("weights",weights, opt.cfg)
-            cfg_model = Darknet(opt.cfg, (opt.imgsz, opt.imgsz))
+            cfg_model = Darknet(cfg, (imgsz, imgsz))
 
             initialize_weights(cfg_model)
 
