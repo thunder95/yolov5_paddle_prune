@@ -1,4 +1,4 @@
-# YOLOv5 reproduction 🚀 by thunder95
+# YOLOv5 reproduction 🚀 by GuoQuanhao
 """
 Common layers
 """

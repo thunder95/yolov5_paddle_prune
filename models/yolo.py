@@ -1,4 +1,4 @@
-# YOLOv5 reproduction 🚀 by thunder95
+# YOLOv5 reproduction 🚀 by GuoQuanhao
 """
 YOLO-specific layers
 
@@ -54,11 +54,55 @@ class Detect(nn.Layer):
         for i in range(self.nl):
             x[i] = self.m[i](x[i])  # conv
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
+            # x[i] = x[i].reshape([bs, self.na, self.no, ny, nx]).transpose([0, 1, 3, 4, 2])
+            x[i] = x[i].reshape([bs, self.na, self.no, ny * nx]).transpose([0, 1, 3, 2])
+
+            if not self.training:  # inference
+                # y = F.sigmoid(x[i]).reshape((bs, self.na, ny * nx * self.no))
+                y = F.sigmoid(x[i])
+                print("====>y shape: ", y.shape)
+
+                # # y[:, :, :, :, 0:2] = y[:, :, :, :, 0:2] * 2. - 0.5
+                # # y[:,:,:,:, 2:4] = (y[:,:,:,:, 2:4] * 2) ** 2
+                # # max_val = paddle.max(y[:, :, :, :, 5:], axis=-1)
+                # # max_idx = paddle.argmax(y[:, :, :, :, 5:], axis=-1)
+                # # y[:, :, :, :, 5] = max_idx.astype(y.dtype)
+                # # y[:, :, :, :, 6] = max_val * y[:, :, :, :, 4]
+                #
+                # y1 = y[:, :, :, :, 0:2] * 2. - 0.5
+                # y2 = (y[:,:,:,:, 2:4] * 2) ** 2
+                # y3 = paddle.unsqueeze(y[:,:,:,:, 4],  axis=[-1])
+                #
+                # cls_cols = y[:, :, :, :, 5:]
+                # # max_val = paddle.max(cls_cols, axis=-1, keepdim=True).astype(y.dtype)
+                # max_idx = paddle.argmax(cls_cols, axis=-1, keepdim=True).astype(y.dtype)
+                # max_val = paddle.max(cls_cols, axis=-1, keepdim=True).astype(y.dtype)
+                #
+                # # print("--===>", y.shape, max_val.shape, max_idx.shape)
+                # # y4 = paddle.unsqueeze(max_idx,axis=[0])
+                # # # y5 = paddle.unsqueeze(paddle.multiply(max_val, y[:, :, :, :, 4]), axis=[-1])
+                # # y5 = paddle.unsqueeze(max_val, axis=[0])
+                #
+                # # if i == 2 and y.shape[2] > 11:
+                # #     print(y.shape)
+                # #     print(y3[0, 1, 11, 8], y5[0, 1, 11, 8], max_val[0, 1, 11, 8])
+                # #     print("checking...", y[0, 1, 11, 8, 4], paddle.max(y[0, 1, 11, 8, 5:])) # score max_val
+                #
+                # z.append(paddle.concat([y1, y2, y3, max_idx, max_val], axis=-1))
+
+                z.append(y)
+
+        return x if self.training else z
+
+    def forward_bk2(self, x):
+        z = []  # inference output
+        for i in range(self.nl):
+            x[i] = self.m[i](x[i])  # conv
+            bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].reshape([bs, self.na, self.no, ny, nx]).transpose([0, 1, 3, 4, 2])
 
             if not self.training:  # inference
                 if self.grid[i].shape[2:4] != x[i].shape[2:4] or self.onnx_dynamic:
-                    # print("before grid", ny, nx, self.grid[i].shape, self.anchor_grid[i].shape)
                     self.grid[i], self.anchor_grid[i] = self._make_grid(nx, ny, i)
 
                 y = F.sigmoid(x[i])
@@ -73,24 +117,10 @@ class Detect(nn.Layer):
 
         return x if self.training else (paddle.concat(z, 1), x)
 
-    def _make_grid(self, nx=20, ny=20, i=0):
-        if check_version(paddle.__version__, '2.0.0'):  # you should use paddle version>=2.0.0
-            yv, xv = paddle.meshgrid([paddle.arange(ny), paddle.arange(nx)], indexing='ij')
-        else:
-            yv, xv = paddle.meshgrid([paddle.arange(ny), paddle.arange(nx)])
-
-        grid = paddle.stack((xv, yv), 2).expand((1, self.na, ny, nx, 2)).astype('float32')
-
-        anchor_grid = (self.anchors[i].clone() * self.stride[i]) \
-            .reshape((1, self.na, 1, 1, 2)).expand((1, self.na, ny, nx, 2)).astype('float32')
-
-        # print("--->_make_grid shape", nx, ny, yv.shape, xv.shape, grid.shape, anchor_grid.shape)
-        return grid, anchor_grid
-
-
 class Model(nn.Layer):
     def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None, mode='training'):  # model, input channels, number of classes
-        super().__init__()
+        # super().__init__()
+        super(Model, self).__init__()
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict
         else:  # is *.yaml
@@ -116,8 +146,16 @@ class Model(nn.Layer):
         if isinstance(m, Detect):
             s = 256  # 2x min stride
             m.inplace = self.inplace
+
+            # x = self.forward(paddle.zeros([1, ch, s, s]))
+            # print(x)
+
             m.stride = paddle.to_tensor([s / x.shape[-2] for x in self.forward(paddle.zeros([1, ch, s, s]))])  # forward
+            # m.stride = paddle.to_tensor([x.shape[-2] for x in self.forward(paddle.zeros([1, ch, s, s]))])  # forward
+            # print(m.stride)
+            # print("m.stride.shape===>", ch, s, m.stride)
             m.anchors /= m.stride.reshape([-1, 1, 1])
+            # print(m.anchors)
             check_anchor_order(m)
             self.stride = m.stride
             self._initialize_biases()  # only run once
@@ -128,6 +166,7 @@ class Model(nn.Layer):
         print('')
 
     def forward(self, x, augment=False, profile=False, visualize=False):
+        # print("--->ori input: ", x.shape, x)
         if augment:
             return self._forward_augment(x)  # augmented inference, None
         return self._forward_once(x, profile, visualize)  # single-scale inference, train
@@ -147,16 +186,27 @@ class Model(nn.Layer):
         return paddle.concat(y, 1), None  # augmented inference, train
 
     def _forward_once(self, x, profile=False, visualize=False):
+
+        print(self.save)
         y, dt = [], []  # outputs
         for m in self.model:
+
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+                print(m.f)
+
             if profile:
                 self._profile_one_layer(m, x, dt)
+
+            if isinstance(m, Detect):
+                print(m, m.anchors, m.na)
+
             x = m(x)
+
             y.append(x if m.i in self.save else None)  # save output
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
+
         return x
 
     def _descale_pred(self, p, flips, scale, img_size):
@@ -226,6 +276,7 @@ class Model(nn.Layer):
         print('Fusing layers... ')
         for m in self.model.sublayers():
             if isinstance(m, (Conv, DWConv)) and hasattr(m, 'bn'):
+                # print(m.bn)
                 m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
                 delattr(m, 'bn')  # remove batchnorm
                 m.forward = m.forward_fuse  # update forward

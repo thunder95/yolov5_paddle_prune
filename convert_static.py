@@ -1,4 +1,4 @@
-# YOLOv5 reproduction 🚀 by thunder95
+# YOLOv5 reproduction 🚀 by GuoQuanhao
 """
 Run inference on images, videos, directories, streams, etc.
 
@@ -38,7 +38,7 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
         cfg = None,
         hyp = None,
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
-        imgsz=640,  # inference size (pixels)
+        imgsz=320,  # inference size (pixels)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
@@ -151,6 +151,8 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
         t1 = time_sync()
 
         img = cv2.imread("crop.jpg")
+        # 调整到 320 320
+        img = cv2.resize(img, (320, 320))
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
 
@@ -180,6 +182,16 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
         strides = [8, 16, 32]
         anchors = [[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]]
 
+        wx, hy = 320, 320
+        dim = ((strides[0] / hy, strides[0] / wx), (strides[1] / hy, strides[1] / wx),  (strides[2] / hy, strides[2] / wx))
+        xdim = (int(wx / strides[0]), int(wx / strides[1]), int(wx / strides[2]))
+
+        s = hy * wx
+        dim_num = (int(s / (strides[0] * strides[0])), int(s / (strides[1] * strides[1])),  int(s / (strides[2] * strides[2])))
+        cls_num = 80
+        row_num = cls_num + 5
+
+
         if pdparams:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
             model.eval()
@@ -190,66 +202,167 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
             for p in pred:
                 print(p.shape)
 
+
+
             # # 后处理提取boxes
             boxes = []  # xywh, score, cls
+
             for l in range(len(pred)):
                 pred[l] = pred[l].numpy()
-                bs, ch, ny, nx, _ = pred[l].shape
-                # print("pred shape", pred[l].shape, pred[l].flatten()[4396],  pred[l].flatten()[4398],  pred[l].flatten()[4399])
-
-
-                print(pred[l].flatten()[:10])
-
+                bs, ch, nd, cn = pred[l].shape
+                rows = dim_num[l]
+                print(l, rows)
                 for b in range(bs):
                     for c in range(ch):
-                        for y in range(ny):
-                            for x in range(nx):
-                                # if x < 5:
-                                #     print("===>", pred[l][b, c, y, x])
-                                # else:
-                                #     exit(1)
+                        for r in range(rows):
+                            offset = r * row_num
+                            max_cls_val = 0
+                            max_cls_id = 0
+                            score = pred[l][b, c, r, 4]
+                            if score < conf_thres:
+                                continue
 
-                                #wywhs cls[80]
-                                max_cls_id = 0
-                                max_cls_val = 0
-                                for i in range(80):
-                                    if pred[l][b, c, y, x, i + 5] > max_cls_val:
-                                        max_cls_val = pred[l][b, c, y, x, i + 5]
-                                        max_cls_id = i
+                            for i in range(80):
+                                if pred[l][b, c, r, i + 5] > max_cls_val:
+                                    max_cls_val = pred[l][b, c, r, i + 5]
+                                    max_cls_id = i
 
-                                score = max_cls_val * pred[l][b, c, y, x, 4]
+                            score*= max_cls_val
+                            if score < conf_thres:
+                                continue
 
-                                if b == 0 and c == 0 and y == 24 and x == 32:
-                                    # print("tmp box:", pred[l][b, c, y, x], (b, c, y, x))
-                                    print("tmp box:", max_cls_val, pred[l][b, c, y, x, 4], (b, c, y, x))
-                                    print(pred[l][b, c, y, x, :10])
-                                    tmpp = pred[l].flatten()
+                            y = int(r / xdim[l])
+                            x = int(r % xdim[l])
+                            # print("===>good score: ", b, c, y, x, score, pred[l][b, c, offset],
+                            #       pred[l][b, c, offset+1], pred[l][b, c, offset+2], pred[l][b, c, offset+3], y, strides[l])
 
-                                    ptmp = []
-                                    for k in range(10):
-                                        ptmp.append(tmpp[y*nx*85 + x*85+k])
-                                    print(ptmp)
+                            tmp_box = [
+                                (pred[l][b, c, r, 0] * 2 - 0.5 + x) * strides[l],
+                                (pred[l][b, c, r, 1] * 2 - 0.5 + y) * strides[l],  # i, y, x, 2
+                                (pred[l][b, c, r, 2] * 2) ** 2 * anchors[l][c * 2],
+                                (pred[l][b, c, r, 3] * 2) ** 2 * anchors[l][c * 2 + 1],
+                                max_cls_id,
+                                score, #scores
+                            ]
+                            # print(tmp_box)
 
-                                if score < conf_thres:
-                                    continue
-                                print("===>good score: ", b, c, y, x, score, conf_thres, iou_thres)
-
-                                tmp_box = [
-                                    (pred[l][b, c, y, x, 0] * 2 - 0.5 + x) * strides[l],
-                                    (pred[l][b, c, y, x, 1] * 2 - 0.5 + y) * strides[l],  # i, y, x, 2
-                                    (pred[l][b, c, y, x, 2] * 2) ** 2 * anchors[l][c * 2],
-                                    (pred[l][b, c, y, x, 3] * 2) ** 2 * anchors[l][c * 2 + 1],
-                                    max_cls_id,
-                                    score, #scores
-                                ]
-
-                                tmp_box[0] = tmp_box[0] - tmp_box[2] / 2  # x1
-                                tmp_box[1] = tmp_box[1] - tmp_box[3] / 2  # y1
-                                tmp_box[2] = tmp_box[0] + tmp_box[2]      # x2
-                                tmp_box[3] = tmp_box[1] + tmp_box[3]      # y2
+                            tmp_box[0] = tmp_box[0] - tmp_box[2] / 2  # x1
+                            tmp_box[1] = tmp_box[1] - tmp_box[3] / 2  # y1
+                            tmp_box[2] = tmp_box[0] + tmp_box[2]      # x2
+                            tmp_box[3] = tmp_box[1] + tmp_box[3]      # y2
 
 
-                                boxes.append(tmp_box)
+                            boxes.append(tmp_box)
+
+
+
+            # for l in range(len(pred)):
+            #     pred[l] = pred[l].numpy()
+            #     bs, ch, nd = pred[l].shape
+            #     rows = dim_num[l]
+            #     print(l, rows)
+            #     for b in range(bs):
+            #         for c in range(ch):
+            #             for r in range(rows):
+            #                 offset = r * row_num
+            #                 max_cls_val = 0
+            #                 max_cls_id = 0
+            #                 score = pred[l][b, c, offset + 4]
+            #                 if score < conf_thres:
+            #                     continue
+            #
+            #                 for i in range(80):
+            #                     if pred[l][b, c, offset + i + 5] > max_cls_val:
+            #                         max_cls_val = pred[l][b, c, offset + i + 5]
+            #                         max_cls_id = i
+            #
+            #                 score*= max_cls_val
+            #                 if score < conf_thres:
+            #                     continue
+            #
+            #                 y = int(r / xdim[l])
+            #                 x = int(r % xdim[l])
+            #                 # print("===>good score: ", b, c, y, x, score, pred[l][b, c, offset],
+            #                 #       pred[l][b, c, offset+1], pred[l][b, c, offset+2], pred[l][b, c, offset+3], y, strides[l])
+            #
+            #                 tmp_box = [
+            #                     (pred[l][b, c, offset] * 2 - 0.5 + x) * strides[l],
+            #                     (pred[l][b, c, offset + 1] * 2 - 0.5 + y) * strides[l],  # i, y, x, 2
+            #                     (pred[l][b, c, offset + 2] * 2) ** 2 * anchors[l][c * 2],
+            #                     (pred[l][b, c, offset + 3] * 2) ** 2 * anchors[l][c * 2 + 1],
+            #                     max_cls_id,
+            #                     score, #scores
+            #                 ]
+            #                 # print(tmp_box)
+            #
+            #                 tmp_box[0] = tmp_box[0] - tmp_box[2] / 2  # x1
+            #                 tmp_box[1] = tmp_box[1] - tmp_box[3] / 2  # y1
+            #                 tmp_box[2] = tmp_box[0] + tmp_box[2]      # x2
+            #                 tmp_box[3] = tmp_box[1] + tmp_box[3]      # y2
+            #
+            #
+            #                 boxes.append(tmp_box)
+
+            # for l in range(len(pred)):
+            #     pred[l] = pred[l].numpy()
+            #     bs, ch, ny, nx, _ = pred[l].shape
+            #     # print("pred shape", pred[l].shape, pred[l].flatten()[4396],  pred[l].flatten()[4398],  pred[l].flatten()[4399])
+            #
+            #
+            #     print(pred[l].flatten()[:10])
+            #
+            #     for b in range(bs):
+            #         for c in range(ch):
+            #             for y in range(ny):
+            #                 for x in range(nx):
+            #                     # if x < 5:
+            #                     #     print("===>", pred[l][b, c, y, x])
+            #                     # else:
+            #                     #     exit(1)
+            #
+            #                     #wywhs cls[80]
+            #                     max_cls_id = 0
+            #                     max_cls_val = 0
+            #                     for i in range(80):
+            #                         if pred[l][b, c, y, x, i + 5] > max_cls_val:
+            #                             max_cls_val = pred[l][b, c, y, x, i + 5]
+            #                             max_cls_id = i
+            #
+            #                     score = max_cls_val * pred[l][b, c, y, x, 4]
+            #
+            #                     if b == 0 and c == 0 and y == 24 and x == 32:
+            #                         # print("tmp box:", pred[l][b, c, y, x], (b, c, y, x))
+            #                         print("tmp box:", max_cls_val, pred[l][b, c, y, x, 4], (b, c, y, x))
+            #                         print(pred[l][b, c, y, x, :10])
+            #                         tmpp = pred[l].flatten()
+            #
+            #                         ptmp = []
+            #                         for k in range(10):
+            #                             ptmp.append(tmpp[y*nx*85 + x*85+k])
+            #                         print(ptmp)
+            #
+            #                     if score < conf_thres:
+            #                         continue
+            #                     print("===>good score: ", b, c, y, x, score, pred[l][b, c, y, x, 0],
+            #                           pred[l][b, c, y, x, 1], pred[l][b, c, y, x, 2], pred[l][b, c, y, x, 3], y, strides[l])
+            #
+            #                     tmp_box = [
+            #                         (pred[l][b, c, y, x, 0] * 2 - 0.5 + x) * strides[l],
+            #                         (pred[l][b, c, y, x, 1] * 2 - 0.5 + y) * strides[l],  # i, y, x, 2
+            #                         (pred[l][b, c, y, x, 2] * 2) ** 2 * anchors[l][c * 2],
+            #                         (pred[l][b, c, y, x, 3] * 2) ** 2 * anchors[l][c * 2 + 1],
+            #                         max_cls_id,
+            #                         score, #scores
+            #                     ]
+            #                     print(tmp_box)
+            #
+            #                     tmp_box[0] = tmp_box[0] - tmp_box[2] / 2  # x1
+            #                     tmp_box[1] = tmp_box[1] - tmp_box[3] / 2  # y1
+            #                     tmp_box[2] = tmp_box[0] + tmp_box[2]      # x2
+            #                     tmp_box[3] = tmp_box[1] + tmp_box[3]      # y2
+            #
+            #
+            #                     boxes.append(tmp_box)
 
                 # print("layer boxes: ", l, len(boxes))
 
@@ -257,10 +370,12 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
             # print("len(boxes)", len(boxes), conf_thres, iou_thres)
 
             boxes = np.asarray(boxes)
-            # print("===> boxes: ", boxes)
+            print("===> boxes: ", boxes)
             # print(boxes.shape)
-            idx = nms(boxes[:, :4], boxes[:, 5], iou_thres)
-            # print("after nms: ", idx)
+
+            if len(list(boxes)):
+                idx = nms(boxes[:, :4], boxes[:, 5], iou_thres)
+                print("after nms: ", idx)
             # exit()
             # print(len(idx), idx)
             # # exit()
@@ -290,9 +405,9 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
             # print("===============================================================")
 
             # todo
-            x_spec = paddle.static.InputSpec(shape=[None, 3, 640, 640], dtype='float32', name='x')
+            x_spec = paddle.static.InputSpec(shape=[None, 3, 320, 320], dtype='float32', name='x')
             net = paddle.jit.save(model, path='simple_net', input_spec=[x_spec])  # 动静转换
-
+            exit()
 
             # pred = model(x, augment=augment, visualize=visualize)[0]
             # print(pred)
@@ -367,13 +482,13 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
-            print("--->", i, det)
-            continue
+            # print("--->", i, det)
+            # continue
 
             seen += 1
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
-                s += f'{i}: '
+                s += f'{str(i)}: '
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
@@ -381,6 +496,7 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
             print(img.shape[2:], type(img.shape[2:]))
+            s = str(s)
             s += '%gx%g ' % tuple(img.shape[2:])  # print string
             gn = paddle.to_tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
@@ -420,7 +536,7 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
 
             # Stream results
             im0 = annotator.result()
-            if view_img:
+            if True or view_img:
                 cv2.imshow(str(p), im0)
                 cv2.waitKey(1)  # 1 millisecond
 
@@ -444,13 +560,13 @@ def run(weights=ROOT / 'yolov5s.pdparams',  # model.pdparams path(s)
                     vid_writer[i].write(im0)
 
     # Print results
-    t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
-    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
-    if save_txt or save_img:
-        s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
-    if update:
-        strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
+    # t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
+    # LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
+    # if save_txt or save_img:
+    #     s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
+    #     LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
+    # if update:
+    #     strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
 
 
 def parse_opt():
