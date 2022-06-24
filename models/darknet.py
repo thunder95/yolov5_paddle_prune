@@ -1,7 +1,7 @@
 import paddle
 import paddle.nn as nn
 import numpy as np
-
+from .common import SiLU
 
 def create_grids(self, img_size=416, ng=(13, 13), type="float32"):
     nx, ny = ng  # x and y grid size
@@ -96,7 +96,7 @@ def create_modules(module_defs, img_size, arc):
             elif mdef['activation'] == 'Hardswish':
                 modules.add_sublayer('activation', nn.Hardswish())
             elif mdef['activation']=='SiLU':
-                modules.add_sublayer('activation', nn.Silu())
+                modules.add_sublayer('activation', SiLU())
         elif mdef['type'] == 'convolutional_nobias':
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
